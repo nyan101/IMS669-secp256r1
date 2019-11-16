@@ -122,3 +122,40 @@ void __p256int_sub(p256_int *out, p256_int *a, p256_int *b)
 
     p256int_cpy(out, &res);
 }
+
+
+void __p256int_mul(p256_double_int *out, p256_int *a, p256_int *b)
+{
+    llint uv=0;
+
+    for(int i=0;i<(a->len);i++)
+    {
+        uv = (llint)(a->data[i])*(b->data[0]) + (uv >> (WSIZE*8));
+        out->data[i] = (lint)uv;
+    }
+    out->data[a->len] = uv >> (WSIZE*8);
+
+    for(int j=1;j<(b->len);j++)
+    {
+        uv = 0;
+        for(int i=0;i<(a->len);i++)
+        {
+            uv = (llint)(a->data[i])*(b->data[j]) + (uv >> (WSIZE*8)) + (out->data[i+j]);
+            out->data[i+j] = (lint)uv;
+        }
+        out->data[j+(a->len)] = uv >> (WSIZE*8);
+    }
+
+    out->len = (a->len) + (b->len);
+    if((out->len) > 0 && out->data[out->len-1]==0)
+        out->len -= 1;
+}
+
+
+void __p256doubleint_to_mpz(mpz_t out, p256_double_int *in)
+{
+    for(int i=0;i<(in->len);i++)
+        out->_mp_d[i] = in->data[i];
+
+    out->_mp_size = in->len;
+}

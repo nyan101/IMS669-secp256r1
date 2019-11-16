@@ -21,6 +21,16 @@ clock_t elapsed; float sec;
  printf("\n[%s: %.5f s]\n",qstr,sec);\
 }\
 
+void test_p256_add_sub();
+void test_p256_mul();
+
+int main(void)
+{
+	test_p256_mul();
+
+    return 0;
+}
+
 
 void test_p256_add_sub()
 {
@@ -94,9 +104,73 @@ void test_p256_add_sub()
 }
 
 
-int main(void)
+void test_p256_mul()
 {
-	test_p256_add_sub();
+    p256_int a, b;
+    p256_double_int c;
+    mpz_t p256_prime_mpz, a_mpz, b_mpz, c_mpz, d_mpz;
+    gmp_randstate_t state;
 
-    return 0;
+    int num_test, num_correct;
+
+    // init
+    num_test = 10000;
+    num_correct = 0;
+    mpz_init2(a_mpz, 256); mpz_init2(b_mpz, 256);
+    mpz_init2(c_mpz, 512); mpz_init2(d_mpz, 512);
+    mpz_init2(p256_prime_mpz, 256);
+    p256int_to_mpz(p256_prime_mpz, &p256_prime);
+    gmp_randinit_default(state);
+
+    // correct test
+    printf("* Mul Correct Test Begin...");
+    for(int i=0;i<num_test;i++)
+    {
+        mpz_urandomm(a_mpz, state, p256_prime_mpz);
+        mpz_urandomm(b_mpz, state, p256_prime_mpz);
+
+        // kminchul : c = a * b
+        mpz_to_p256int(&a, a_mpz);
+        mpz_to_p256int(&b, b_mpz);
+        __p256int_mul(&c, &a, &b);
+        __p256doubleint_to_mpz(c_mpz, &c);
+
+        // gmp : d = a * b
+        mpz_mul(d_mpz, a_mpz, b_mpz);
+
+        // test
+        if(mpz_cmp(c_mpz, d_mpz)!=0)
+        {
+            printf("<Mul Test Failed>\n");
+            gmp_printf("%d, %Zx\n", c.len, c_mpz);
+            gmp_printf("%d, %Zx\n", d_mpz->_mp_size, d_mpz);
+        }
+        else
+            num_correct++;
+    }
+    printf("End (%d/%d)\n\n", num_correct, num_test);
+
+    num_test = 10000000;
+    mpz_urandomm(a_mpz, state, p256_prime_mpz);
+    mpz_urandomm(b_mpz, state, p256_prime_mpz);
+    mpz_to_p256int(&a, a_mpz);
+    mpz_to_p256int(&b, b_mpz);
+    printf("* Speed Test with %d Run\n", num_test);
+    printf("word size : %d\n", WSIZE);
+    gmp_printf("a : %Zx \n", a_mpz);
+    gmp_printf("b : %Zx \n", b_mpz);
+    
+    // speed test #1
+	START_WATCH;
+    for(int i=0;i<num_test;i++)
+        mpz_mul(d_mpz, a_mpz, b_mpz);
+	STOP_WATCH;
+	PRINT_TIME("mpz_mul time");
+
+    // speed test #2
+	START_WATCH;
+    for(int i=0;i<num_test;i++)
+        __p256int_mul(&c, &a, &b);
+	STOP_WATCH;
+	PRINT_TIME("p256_mul time");
 }
