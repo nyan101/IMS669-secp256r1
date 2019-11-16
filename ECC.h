@@ -36,12 +36,9 @@ void p256int_to_mpz(mpz_t out, p256_int *in);
 
 void p256int_add(p256_int *out, p256_int *a, p256_int *b);
 void p256int_sub(p256_int *out, p256_int *a, p256_int *b);
+void p256int_mul(p256_int *out, p256_int *a, p256_int *b); // 64-bit version only
 void p256int_cpy(p256_int *dst, p256_int *src);
 int p256int_cmp(p256_int *a, p256_int *b); // 1:a>b, 0:a==b, -1:a<b
-
-// temporal functions w/o modular process
-void __p256int_mul(p256_double_int *out, p256_int *a, p256_int *b);
-void __p256doubleint_to_mpz(mpz_t out, p256_double_int *in);
 
 // p256_prime = 2^256 - 2^224 + 2^192 + 2^96 - 1
 #if WSIZE == 8

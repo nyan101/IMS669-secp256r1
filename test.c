@@ -106,18 +106,16 @@ void test_p256_add_sub()
 
 void test_p256_mul()
 {
-    p256_int a, b;
-    p256_double_int c;
+    p256_int a, b, c;
     mpz_t p256_prime_mpz, a_mpz, b_mpz, c_mpz, d_mpz;
     gmp_randstate_t state;
-
     int num_test, num_correct;
 
     // init
     num_test = 10000;
     num_correct = 0;
     mpz_init2(a_mpz, 256); mpz_init2(b_mpz, 256);
-    mpz_init2(c_mpz, 512); mpz_init2(d_mpz, 512);
+    mpz_init2(c_mpz, 256); mpz_init2(d_mpz, 256);
     mpz_init2(p256_prime_mpz, 256);
     p256int_to_mpz(p256_prime_mpz, &p256_prime);
     gmp_randinit_default(state);
@@ -132,18 +130,20 @@ void test_p256_mul()
         // kminchul : c = a * b
         mpz_to_p256int(&a, a_mpz);
         mpz_to_p256int(&b, b_mpz);
-        __p256int_mul(&c, &a, &b);
-        __p256doubleint_to_mpz(c_mpz, &c);
+        p256int_mul(&c, &a, &b);
+        p256int_to_mpz(c_mpz, &c);
 
         // gmp : d = a * b
         mpz_mul(d_mpz, a_mpz, b_mpz);
+        mpz_mod(d_mpz, d_mpz, p256_prime_mpz);
+
 
         // test
         if(mpz_cmp(c_mpz, d_mpz)!=0)
         {
             printf("<Mul Test Failed>\n");
-            gmp_printf("%d, %Zx\n", c.len, c_mpz);
-            gmp_printf("%d, %Zx\n", d_mpz->_mp_size, d_mpz);
+            gmp_printf("my  : %d, %Zx\n", c.len, c_mpz);
+            gmp_printf("mpz : %d, %Zx\n", d_mpz->_mp_size, d_mpz);
         }
         else
             num_correct++;
@@ -163,14 +163,17 @@ void test_p256_mul()
     // speed test #1
 	START_WATCH;
     for(int i=0;i<num_test;i++)
+    {
         mpz_mul(d_mpz, a_mpz, b_mpz);
+        mpz_mod(d_mpz, d_mpz, p256_prime_mpz);
+    }
 	STOP_WATCH;
-	PRINT_TIME("mpz_mul time");
+	PRINT_TIME("mpz_mul_mod time");
 
     // speed test #2
 	START_WATCH;
     for(int i=0;i<num_test;i++)
-        __p256int_mul(&c, &a, &b);
+        p256int_mul(&c, &a, &b);
 	STOP_WATCH;
-	PRINT_TIME("p256_mul time");
+	PRINT_TIME("p256_mul_mod time");
 }
