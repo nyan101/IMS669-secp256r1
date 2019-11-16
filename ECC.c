@@ -217,7 +217,7 @@ void p256_AF_cpy(p256_AF_pt *R, p256_AF_pt *P)
 
 int p256_AF_dbl(p256_AF_pt *R, p256_AF_pt *P)
 {
-    if(P->at_infinity)
+    if(P->at_infinity || P->y.len==0)
     {
         R->at_infinity = 1;
         return 0;
