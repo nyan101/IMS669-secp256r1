@@ -73,58 +73,6 @@ void p256int_sub(p256_int *out, p256_int *a, p256_int *b)
 }
 
 
-void __p256int_add(p256_int *out, p256_int *a, p256_int *b)
-{
-    if((a->len) < (b->len))
-    {
-        p256_int *t = a; a = b; b = t;
-    }
-
-    p256_int res;
-    lint carry=0;
-
-    for(int i=0;i<(b->len);i++)
-    {
-        res.data[i] = a->data[i] + b->data[i] + carry;
-        carry = (res.data[i] < (a->data[i])) || (carry==1 && res.data[i] == (a->data[i]));
-    }
-    for(int i=(b->len);i<(a->len);i++)
-    {
-        res.data[i] = a->data[i] + carry;
-        carry = (carry==1 && res.data[i]==0);
-    }
-    res.data[a->len] = carry;
-    res.len = a->len + carry;
-
-    p256int_cpy(out, &res);
-}
-
-
-// c = a-b (WLOG, a >= b)
-void __p256int_sub(p256_int *out, p256_int *a, p256_int *b)
-{
-    p256_int res;
-    lint borrow=0;
-
-    for(int i=0;i<(b->len);i++)
-    {
-        res.data[i] = a->data[i] - b->data[i] - borrow;
-        borrow = (a->data[i] < b->data[i]) || (borrow==1 && (a->data[i]==b->data[i]));
-    }
-    for(int i=(b->len);i<(a->len);i++)
-    {
-        res.data[i] = a->data[i] - borrow;
-        borrow = (borrow==1 && a->data[i]==0);
-    }
-    res.len = a->len;
-
-    while(res.len>0 && res.data[res.len-1]==0)
-        res.len--;
-
-    p256int_cpy(out, &res);
-}
-
-
 // 64-bit only
 void p256int_mul(p256_int *out, p256_int *a, p256_int *b)
 {
@@ -216,6 +164,178 @@ void p256int_mul(p256_int *out, p256_int *a, p256_int *b)
 
     // res = res - tes
     p256int_sub(&res, &res, &tes);
+    p256int_cpy(out, &res);
+}
+
+
+// return -1 for 0^(-1)
+int p256int_inv(p256_int *out, p256_int *a)
+{
+    if(a->len == 0)
+        return -1;
+
+    mpz_t a_mpz, res_mpz, mod_mpz;
+
+    mpz_init2(a_mpz, 256);
+    mpz_init2(res_mpz, 256);
+    mpz_init2(mod_mpz, 256);
+
+    p256int_to_mpz(a_mpz, a);
+    p256int_to_mpz(mod_mpz, &p256_prime);
+
+    mpz_invert(res_mpz, a_mpz, mod_mpz);
+
+    mpz_to_p256int(out, res_mpz);
+
+    mpz_clear(a_mpz);
+    mpz_clear(res_mpz);
+    mpz_clear(mod_mpz);
+
+    return 0;
+}
+
+
+// 0: P == Q , otherwise: P != Q
+int p256_AF_cmp(p256_AF_pt *P, p256_AF_pt *Q)
+{
+    if(P->at_infinity == Q->at_infinity)
+    {
+        if(P->at_infinity)
+            return 0;
+
+        return p256int_cmp(&P->x, &Q->x) || p256int_cmp(&P->y, &Q->y);
+    }
+    return 1;
+}
+
+void p256_AF_cpy(p256_AF_pt *R, p256_AF_pt *P)
+{
+    p256int_cpy(&R->x, &P->x);
+    p256int_cpy(&R->y, &P->y);
+    R->at_infinity = P->at_infinity;
+}
+
+int p256_AF_dbl(p256_AF_pt *R, p256_AF_pt *P)
+{
+    if(P->at_infinity)
+    {
+        R->at_infinity = 1;
+        return 0;
+    }
+
+    static p256_int lambda, dx, dy, x3, y3, tmp;
+    p256int_add(&dx, &P->y, &P->y);
+    p256int_mul(&tmp, &P->x, &P->x);
+    p256int_add(&dy, &tmp, &tmp);
+    p256int_add(&dy, &dy, &tmp);
+    p256int_add(&dy, &dy, &p256_coef_a);
+    
+    p256int_inv(&dx, &dx);
+    p256int_mul(&lambda, &dx, &dy);
+    p256int_mul(&x3, &lambda, &lambda);
+    p256int_sub(&x3, &x3, &P->x);
+    p256int_sub(&x3, &x3, &P->x);
+    p256int_sub(&y3, &P->x, &x3);
+    p256int_mul(&y3, &y3, &lambda);
+    p256int_sub(&y3, &y3, &P->y);
+
+    p256int_cpy(&R->x, &x3);
+    p256int_cpy(&R->y, &y3);
+    R->at_infinity = 0;
+
+    return 0;
+}
+
+int p256_AF_add(p256_AF_pt *R, p256_AF_pt *P, p256_AF_pt *Q)
+{
+    if(P->at_infinity)
+    {
+        p256_AF_cpy(R, Q);
+        return 0;
+    }
+    if(Q->at_infinity)
+    {
+        p256_AF_cpy(R, P);
+        return 0;
+    }
+    if(p256int_cmp(&P->x, &Q->x)==0)
+    {
+        if(p256int_cmp(&P->y, &Q->y)==0)
+            p256_AF_dbl(R, P);
+        else
+            R->at_infinity = 1;
+
+        return 0;
+    }
+
+    static p256_int lambda, dx, dy, x3, y3;
+    
+    p256int_sub(&dx, &P->x, &Q->x);
+    p256int_sub(&dy, &P->y, &Q->y);
+    p256int_inv(&dx, &dx);
+    p256int_mul(&lambda, &dx, &dy);
+    p256int_mul(&x3, &lambda, &lambda);
+    p256int_sub(&x3, &x3, &P->x);
+    p256int_sub(&x3, &x3, &Q->x);
+    p256int_sub(&y3, &P->x, &x3);
+    p256int_mul(&y3, &y3, &lambda);
+    p256int_sub(&y3, &y3, &P->y);
+
+    p256int_cpy(&R->x, &x3);
+    p256int_cpy(&R->y, &y3);
+    R->at_infinity = 0;
+    return 0;
+}
+
+
+void __p256int_add(p256_int *out, p256_int *a, p256_int *b)
+{
+    if((a->len) < (b->len))
+    {
+        p256_int *t = a; a = b; b = t;
+    }
+
+    p256_int res;
+    lint carry=0;
+
+    for(int i=0;i<(b->len);i++)
+    {
+        res.data[i] = a->data[i] + b->data[i] + carry;
+        carry = (res.data[i] < (a->data[i])) || (carry==1 && res.data[i] == (a->data[i]));
+    }
+    for(int i=(b->len);i<(a->len);i++)
+    {
+        res.data[i] = a->data[i] + carry;
+        carry = (carry==1 && res.data[i]==0);
+    }
+    res.data[a->len] = carry;
+    res.len = a->len + carry;
+
+    p256int_cpy(out, &res);
+}
+
+
+// c = a-b (WLOG, a >= b)
+void __p256int_sub(p256_int *out, p256_int *a, p256_int *b)
+{
+    p256_int res;
+    lint borrow=0;
+
+    for(int i=0;i<(b->len);i++)
+    {
+        res.data[i] = a->data[i] - b->data[i] - borrow;
+        borrow = (a->data[i] < b->data[i]) || (borrow==1 && (a->data[i]==b->data[i]));
+    }
+    for(int i=(b->len);i<(a->len);i++)
+    {
+        res.data[i] = a->data[i] - borrow;
+        borrow = (borrow==1 && a->data[i]==0);
+    }
+    res.len = a->len;
+
+    while(res.len>0 && res.data[res.len-1]==0)
+        res.len--;
+
     p256int_cpy(out, &res);
 }
 

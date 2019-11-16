@@ -23,10 +23,12 @@ clock_t elapsed; float sec;
 
 void test_p256_add_sub();
 void test_p256_mul();
+void test_p256_ADD_DBL();
+
 
 int main(void)
 {
-	test_p256_mul();
+	test_p256_ADD_DBL();
 
     return 0;
 }
@@ -176,4 +178,49 @@ void test_p256_mul()
         p256int_mul(&c, &a, &b);
 	STOP_WATCH;
 	PRINT_TIME("p256_mul_mod time");
+}
+
+
+void test_p256_ADD_DBL()
+{
+    p256_AF_pt P, Q, R, P2;
+    p256_int x1, x2, x3, y1, y2, y3;
+    mpz_t x1_mpz, x2_mpz, x3_mpz, y1_mpz, y2_mpz, y3_mpz;
+
+    // set values. P=(x1,y1), Q=2P, R=3P
+    mpz_init_set_str(x1_mpz, "83852be5a3ee4d1515bed279cef585d86fe8a730816db6dd00e358c1bccbf133", 16);
+    mpz_init_set_str(y1_mpz, "e3ef1726821ec6586a790fe72631048bce00c41043035aeef8474c884e60b67a", 16);
+    mpz_init_set_str(x2_mpz, "77d12488bbd94b3e4db310972e4d3269d5dccfa28ad82b5e0d3816c5935a1c7d", 16);
+    mpz_init_set_str(y2_mpz, "b6f09c6a49ffa993c03b2e892056fe662266f463f2b74e84423333a115ed2387", 16);
+    mpz_init_set_str(x3_mpz, "757e761357843d8bd5d809acabf5b918802c37168f4da9a89bf8698aefa97140", 16);
+    mpz_init_set_str(y3_mpz, "64dd79cc54a3788441f19d550e03f956f65aec497594b0a531a42ed4fc88b583", 16);
+    // set p256_int
+    mpz_to_p256int(&x1, x1_mpz); mpz_to_p256int(&y1, y1_mpz);
+    mpz_to_p256int(&x2, x2_mpz); mpz_to_p256int(&y2, y2_mpz);
+    mpz_to_p256int(&x3, x3_mpz); mpz_to_p256int(&y3, y3_mpz);
+    // set AF points
+    p256int_cpy(&(P.x), &x1); p256int_cpy(&(P.y), &y1);
+    p256int_cpy(&(Q.x), &x2); p256int_cpy(&(Q.y), &y2);
+    P.at_infinity = Q.at_infinity = 0;
+
+    // doubling test
+    printf("Doubling Test (P2 = P + P) ... ");
+    p256_AF_add(&P2, &P, &P);
+    if(p256int_cmp(&(P2.x), &x2)==0 && p256int_cmp(&(P2.y), &y2)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    // add test
+    printf("Addition Test (R = P + Q = 3P) ... ");
+    p256_AF_add(&R, &P, &Q);
+    if(p256int_cmp(&(R.x), &x3)==0 && p256int_cmp(&(R.y), &y3)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    // clear
+    mpz_clear(x1_mpz); mpz_clear(y1_mpz);
+    mpz_clear(x2_mpz); mpz_clear(y2_mpz);
+    mpz_clear(x3_mpz); mpz_clear(y3_mpz);
 }
