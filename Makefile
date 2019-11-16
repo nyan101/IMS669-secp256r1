@@ -4,7 +4,7 @@ test : ECC.o test.o
 ECC.o : ECC.c ECC.h
 	gcc -c ECC.c -lgmp
 
-test.o : test.c
+test.o : test.c ECC.h
 	gcc -c test.c -lgmp
 
 clean :
