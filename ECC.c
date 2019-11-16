@@ -1,46 +1,7 @@
-#include <stdio.h>
 #include "ECC.h"
 
-int main()
-{
-    p256_int a, b, c, d;
-    mpz_t p256_prime_mpz, a_mpz, b_mpz, c_mpz, d_mpz;
-    gmp_randstate_t state;
-
-    // init
-    mpz_init2(a_mpz, 256); mpz_init2(b_mpz, 256);
-    mpz_init2(c_mpz, 256); mpz_init2(d_mpz, 256);
-    mpz_init2(p256_prime_mpz, 256);
-    gmp_randinit_default(state);
-
-    // generate random numbers for test
-    p256int_to_mpz(p256_prime_mpz, &p256_prime);
-    mpz_urandomm(a_mpz, state, p256_prime_mpz);
-    mpz_urandomm(b_mpz, state, p256_prime_mpz);
-
-    // kminchul : c = (a+b) mod p256
-    mpz_to_p256int(&a, a_mpz);
-    mpz_to_p256int(&b, b_mpz);
-    p256int_add(&c, &a, &b);
-    p256int_to_mpz(c_mpz, &c);
-
-    // gmp : d = (a+b) mod p256
-    mpz_add(d_mpz, a_mpz, b_mpz);
-    mpz_mod(d_mpz, d_mpz, p256_prime_mpz);
-
-    // test
-    if(mpz_cmp(c_mpz, d_mpz)==0)
-        printf("<Test Passed>\n");
-    else
-        printf("<Test Failed>\n");
-
-    gmp_printf("a : %Zd\n", a_mpz);
-    gmp_printf("b : %Zd\n", b_mpz);
-    gmp_printf("my answer  : %Zd\n", c_mpz);
-    gmp_printf("gmp answer : %Zd\n", d_mpz);
-
-    return 0;
-}
+void __p256int_add(p256_int *out, p256_int *a, p256_int *b);
+void __p256int_sub(p256_int *out, p256_int *a, p256_int *b);
 
 
 void p256int_to_mpz(mpz_t out, p256_int *in)
@@ -55,7 +16,6 @@ void p256int_to_mpz(mpz_t out, p256_int *in)
 void mpz_to_p256int(p256_int *out, mpz_t in)
 {
     // in->_mp_size < 0  or  in->_mp_size > P256_MAX_WORD_LEN 이면 ERROR
-
     for(int i=0;i<(in->_mp_size);i++)
         out->data[i] = in->_mp_d[i];
 
@@ -94,6 +54,26 @@ int p256int_cmp(p256_int *a, p256_int *b)
 // c = a+b mod prime
 void p256int_add(p256_int *out, p256_int *a, p256_int *b)
 {
+    __p256int_add(out, a, b);
+    if(p256int_cmp(&p256_prime, out) < 0)
+        __p256int_sub(out, out, &p256_prime);
+}
+
+
+void p256int_sub(p256_int *out, p256_int *a, p256_int *b)
+{
+    if(p256int_cmp(a, b) >= 0)
+        __p256int_sub(out, a, b);
+    else
+    {
+        __p256int_sub(out, b, a);
+        __p256int_sub(out, &p256_prime, out);
+    }
+}
+
+
+void __p256int_add(p256_int *out, p256_int *a, p256_int *b)
+{
     if((a->len) < (b->len))
     {
         p256_int *t = a; a = b; b = t;
@@ -115,24 +95,30 @@ void p256int_add(p256_int *out, p256_int *a, p256_int *b)
     res.data[a->len] = carry;
     res.len = a->len + carry;
 
-    if(p256int_cmp(&p256_prime, &res) < 0)
+    p256int_cpy(out, &res);
+}
+
+
+// c = a-b mod prime (WLOG, a >= b)
+void __p256int_sub(p256_int *out, p256_int *a, p256_int *b)
+{
+    p256_int res;
+    lint borrow=0;
+
+    for(int i=0;i<(b->len);i++)
     {
-        // res -= p256_prime;
-        mpz_t res_mpz, p256_prime_mpz;
-        
-        mpz_init2(res_mpz, 256);
-        p256int_to_mpz(res_mpz, &res);
-
-        mpz_init2(p256_prime_mpz, 256);
-        p256int_to_mpz(p256_prime_mpz, &p256_prime);
-
-        mpz_sub(res_mpz, res_mpz, p256_prime_mpz);
-
-        mpz_to_p256int(&res, res_mpz);
-        
-        mpz_clear(res_mpz);
-        mpz_clear(p256_prime_mpz);
+        res.data[i] = a->data[i] - b->data[i] - borrow;
+        borrow = (a->data[i] < b->data[i]) || (borrow==1 && (a->data[i]==b->data[i]));
     }
+    for(int i=(b->len);i<(a->len);i++)
+    {
+        res.data[i] = a->data[i] - borrow;
+        borrow = (borrow==1 && a->data[i]==0);
+    }
+    res.len = a->len;
+
+    while(res.len>0 && res.data[res.len-1]==0)
+        res.len--;
 
     p256int_cpy(out, &res);
 }
