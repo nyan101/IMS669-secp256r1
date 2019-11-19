@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <gmp.h>
-#include "ECC.h"
+#include "p256_int.h"
+#include "p256_AF.h"
 
 clock_t elapsed; float sec;
 
@@ -29,6 +30,9 @@ void test_p256_SMUL();
 
 int main(void)
 {
+    test_p256_add_sub();
+    test_p256_mul();
+    test_p256_ADD_DBL();
 	test_p256_SMUL();
 
     return 0;
