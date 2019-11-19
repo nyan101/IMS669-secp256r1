@@ -24,13 +24,55 @@ clock_t elapsed; float sec;
 void test_p256_add_sub();
 void test_p256_mul();
 void test_p256_ADD_DBL();
+void test_p256_SMUL();
 
 
 int main(void)
 {
-	test_p256_ADD_DBL();
+	test_p256_SMUL();
 
     return 0;
+}
+
+void test_p256_SMUL()
+{
+    p256_AF_pt P11, R;
+    p256_int eleven;
+
+    // P11 = 11*P
+    eleven.len = 1;
+    eleven.data[0] = 11;
+    P11.at_infinity = 1;
+    for(int i=0;i<11;i++)
+        p256_AF_add(&P11, &P11, &p256_base_point);
+
+    // test #2
+    printf("SMUL Binary Test #1: (11 * P = P11) ... ");
+    p256_AF_binary_smul(&R, &eleven, &p256_base_point);
+    if(p256_AF_cmp(&P11, &R)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    printf("SMUL Binary Test #2: (order * P = O) ... ");
+    p256_AF_binary_smul(&R, &p256_order, &p256_base_point);
+    if(R.at_infinity)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    printf("SMUL Modified M-ary Test #1: (11 * P = P11) ... ");
+    p256_AF_binary_smul(&R, &eleven, &p256_base_point);
+    if(p256_AF_cmp(&P11, &R)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+    printf("SMUL Modified M-ary Test #2: (order * P = O) ... ");
+    p256_AF_M_m_ary_smul(&R, &p256_order, &p256_base_point);
+    if(R.at_infinity)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
 }
 
 
