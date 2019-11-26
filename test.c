@@ -26,14 +26,22 @@ void test_p256_add_sub();
 void test_p256_mul();
 void test_p256_ADD_DBL();
 void test_p256_SMUL();
+void test_ECDH();
+void test_pub_key_validation();
+void test_p256int_bytes_conversions();
+void test_p256_SMUL_speed();
 
 
 int main(void)
 {
-    test_p256_add_sub();
-    test_p256_mul();
-    test_p256_ADD_DBL();
-	test_p256_SMUL();
+    printf("\n---------test_pub_key_validation-------=--\n");
+    test_pub_key_validation();
+    printf("\n------test_p256int_bytes_conversions------\n");
+    test_p256int_bytes_conversions();
+    printf("\n-----------test_p256_SMUL_speed-----------\n");
+    test_p256_SMUL_speed();
+    printf("\n----------------test_ECDH-----------------\n");
+    test_ECDH();
 
     return 0;
 }
@@ -269,4 +277,127 @@ void test_p256_ADD_DBL()
     mpz_clear(x1_mpz); mpz_clear(y1_mpz);
     mpz_clear(x2_mpz); mpz_clear(y2_mpz);
     mpz_clear(x3_mpz); mpz_clear(y3_mpz);
+}
+
+void test_ECDH()
+{
+    p256_int xa, xb, k;
+    p256_AF_pt Qa, Qb, SSa, SSb;
+    mpz_t rand_mpz, p256_prime_mpz;
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    
+    mpz_init(rand_mpz);
+    mpz_init2(p256_prime_mpz, 256);
+    p256int_to_mpz(p256_prime_mpz, &p256_prime);
+
+    // generate (Qa, xa)
+    mpz_urandomm(rand_mpz, state, p256_prime_mpz);
+    mpz_to_p256int(&k, rand_mpz);
+    p256_AF_DH_PK_gen(&Qa, &xa, &k);
+    // generate (Qb, xb)
+    mpz_urandomm(rand_mpz, state, p256_prime_mpz);
+    mpz_to_p256int(&k, rand_mpz);
+    p256_AF_DH_PK_gen(&Qb, &xb, &k);
+    // SSa: gen SS (A side)
+    p256_AF_DH_SS_gen(&SSa, &Qb, &xa);
+    // SSb: gen SS (B side)
+    p256_AF_DH_SS_gen(&SSb, &Qa, &xb);
+
+    printf("<A>\n");
+    printf("xa  : ");   p256int_print(&xa);
+    printf("Qa.x: ");   p256int_print(&Qa.x);
+    printf("Qa.y: ");   p256int_print(&Qa.y);
+    printf("<B>\n");
+    printf("xb  : ");   p256int_print(&xa);
+    printf("Qb.x: ");   p256int_print(&Qa.x);
+    printf("Qb.y: ");   p256int_print(&Qa.y);
+    printf("<Shared Secret>\n");
+    printf("SSa.x: ");  p256int_print(&SSa.x);
+    printf("SSb.x: ");  p256int_print(&SSb.x);
+    printf("SSa.y: ");  p256int_print(&SSa.y);
+    printf("SSb.y: ");  p256int_print(&SSb.y);
+    printf("result: ");
+    if(p256_AF_cmp(&SSa, &SSb)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    mpz_clear(p256_prime_mpz);
+}
+
+void test_pub_key_validation()
+{
+    p256_AF_pt Q;
+    p256_int k;
+    mpz_t k_mpz;
+
+    mpz_init_set_str(k_mpz, "123456", 10);
+    mpz_to_p256int(&k, k_mpz);
+
+    printf("on the curve(expected: Yes): ");
+    p256_AF_M_m_ary_smul(&Q, &k, &p256_base_point);
+    if(pub_key_validation(&Q))
+        printf("Yes\n");
+    else
+        printf(" No\n");
+    
+    printf("on the curve(expected:  No): ");
+    Q.x.data[0] ^= 0x10;
+    if(pub_key_validation(&Q))
+        printf("Yes\n");
+    else
+        printf(" No\n");
+
+    mpz_clear(k_mpz);   
+}
+
+
+void test_p256int_bytes_conversions()
+{
+    mpz_t a_mpz;
+    p256_int a, a_cpy;
+    unsigned char ss[P256_MAX_BUF_LEN * WSIZE];
+    int len;
+
+    // init mpz
+    mpz_init_set_str(a_mpz, "1234567890abcdef1234567890ab", 16);
+    mpz_to_p256int(&a, a_mpz);
+    gmp_printf("p256int: %Zx\n", a_mpz);
+
+    // p256int -> bytes test
+    p256int_to_bytes(ss, &len, &a);
+    printf("bytes:   ");
+    for(int i=0;i<len;i++)
+        printf("%02x", ss[i]);
+    printf("\n");
+
+    // bytes -> p256int test
+    bytes_to_p256int(&a_cpy, ss, len);
+    printf("result: ");
+    if(p256int_cmp(&a, &a_cpy)==0)
+        printf("<PASSED>\n");
+    else
+        printf("<FAILED>\n");
+
+    mpz_clear(a_mpz);
+}
+
+
+void test_p256_SMUL_speed()
+{
+    p256_AF_pt R;
+    int num_test = 1000;
+
+    START_WATCH
+    for(int i=0;i<num_test;i++)
+    p256_AF_binary_smul(&R, &p256_order, &p256_base_point);
+    STOP_WATCH
+    PRINT_TIME("binary smul");
+
+    START_WATCH
+    for(int i=0;i<num_test;i++)
+    p256_AF_M_m_ary_smul(&R, &p256_order, &p256_base_point);
+    STOP_WATCH
+    PRINT_TIME("Modified m-ary smul");
 }

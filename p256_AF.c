@@ -148,3 +148,47 @@ int p256_AF_M_m_ary_smul(p256_AF_pt *R, p256_int *k, p256_AF_pt *P)
 
     return 0;
 }
+
+
+int pub_key_validation(p256_AF_pt *Q)
+{
+    if(Q->at_infinity)  return FALSE;
+    if(p256int_cmp(&Q->x, &p256_prime) >= 0) return FALSE;
+    if(p256int_cmp(&Q->y, &p256_prime) >= 0) return FALSE;
+    
+    p256_int yt, xt, ax;
+
+    p256int_mul(&yt, &Q->y, &Q->y);
+
+    p256int_mul(&xt, &Q->x, &Q->x);
+    p256int_mul(&xt, &xt, &Q->x);
+    p256int_mul(&ax, &Q->x, &p256_coef_a);
+    p256int_add(&xt, &xt, &ax);
+    p256int_add(&xt, &xt, &p256_coef_b);
+    
+    if(p256int_cmp(&xt, &yt)!=0)
+        return FALSE;
+
+    // it's okay to omit cofactor check nQ = O in this case
+    return TRUE;
+}
+
+
+int p256_AF_DH_PK_gen(p256_AF_pt *Q, p256_int *x, p256_int *k)
+{
+    // x = k % order
+    p256int_mod(x, k, &p256_order);
+    // Q = xP
+    p256_AF_M_m_ary_smul(Q, x, &p256_base_point);
+    return 0;
+}
+
+
+int p256_AF_DH_SS_gen(p256_AF_pt *R, p256_AF_pt *Q, p256_int *x)
+{
+    if(pub_key_validation(Q)==FALSE)
+        return -1;
+
+    p256_AF_M_m_ary_smul(R, x, Q);
+    return 0;
+}

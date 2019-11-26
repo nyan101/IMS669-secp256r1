@@ -1,8 +1,20 @@
+#include <stdio.h>
 #include "p256_int.h"
 
 void __p256int_add(p256_int *out, p256_int *a, p256_int *b);
 void __p256int_sub(p256_int *out, p256_int *a, p256_int *b);
 void __p256int_mul(p256_double_int *out, p256_int *a, p256_int *b);
+
+
+void p256int_print(p256_int *a)
+{
+    for(int i=3;i>=0;i--)
+    {
+        printf("%08llx ", (a->data[i]) >> 32);
+        printf("%08llx ", (a->data[i]) & 0xffffffffLL);
+    }
+    printf("\n");
+}
 
 
 void p256int_to_mpz(mpz_t out, p256_int *in)
@@ -21,6 +33,42 @@ void mpz_to_p256int(p256_int *out, mpz_t in)
         out->data[i] = in->_mp_d[i];
 
     out->len = in->_mp_size;
+}
+
+
+void p256int_to_bytes(unsigned char *out, int *outlen, p256_int *in)
+{
+    for(int i=0;i<(in->len);i++)
+    {
+        for(int j=0;j<WSIZE;j++)
+            out[i*WSIZE+j] = ((in->data[i]) >> (j*8)) & 0xff;
+    }
+    *outlen = (in->len) * WSIZE;
+    while(*outlen>0 && out[*outlen-1]==0)
+        *outlen -= 1;
+    for(int i=0;i<(*outlen/2);i++)
+    {
+        int t = out[i];
+        out[i] = out[*outlen-i-1];
+        out[*outlen-i-1] = t;
+    }
+}
+
+
+void bytes_to_p256int(p256_int *out, unsigned char *in, int inlen)
+{
+    unsigned char ss[P256_MAX_BUF_LEN * WSIZE];
+
+    for(int i=0;i<inlen;i++)
+        ss[i] = in[inlen-i-1];
+
+    out->len = (inlen + WSIZE-1)/WSIZE;
+    for(int i=0;i<(out->len);i++)
+    {
+        out->data[i] = 0;
+        for(int j=0;j<WSIZE;j++)
+            out->data[i] += (lint)ss[i*WSIZE+j]<<(j*8);
+    }
 }
 
 
@@ -192,6 +240,25 @@ int p256int_inv(p256_int *out, p256_int *a)
     mpz_clear(mod_mpz);
 
     return 0;
+}
+
+
+void p256int_mod(p256_int *out, p256_int *a, p256_int *mod)
+{
+    mpz_t a_mpz, mod_mpz, out_mpz;
+
+    mpz_init2(a_mpz, 256);
+    mpz_init2(mod_mpz, 256);
+    mpz_init2(out_mpz, 256);
+
+    p256int_to_mpz(a_mpz, a);
+    p256int_to_mpz(mod_mpz, mod);
+    mpz_mod(out_mpz, a_mpz, mod_mpz);
+    mpz_to_p256int(out, out_mpz);
+
+    mpz_clear(a_mpz);
+    mpz_clear(mod_mpz);
+    mpz_clear(out_mpz);
 }
 
 

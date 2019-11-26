@@ -1,6 +1,9 @@
 #ifndef __P256_CONFIG_H_
 #define __P256_CONFIG_H_
 
+#define TRUE 1
+#define FALSE 0
+
 #define WSIZE 8 // 64-bit
 
 #if WSIZE == 8
