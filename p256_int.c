@@ -243,25 +243,6 @@ int p256int_inv(p256_int *out, p256_int *a)
 }
 
 
-void p256int_mod(p256_int *out, p256_int *a, p256_int *mod)
-{
-    mpz_t a_mpz, mod_mpz, out_mpz;
-
-    mpz_init2(a_mpz, 256);
-    mpz_init2(mod_mpz, 256);
-    mpz_init2(out_mpz, 256);
-
-    p256int_to_mpz(a_mpz, a);
-    p256int_to_mpz(mod_mpz, mod);
-    mpz_mod(out_mpz, a_mpz, mod_mpz);
-    mpz_to_p256int(out, out_mpz);
-
-    mpz_clear(a_mpz);
-    mpz_clear(mod_mpz);
-    mpz_clear(out_mpz);
-}
-
-
 void __p256int_add(p256_int *out, p256_int *a, p256_int *b)
 {
     if((a->len) < (b->len))
@@ -348,4 +329,123 @@ void __p256doubleint_to_mpz(mpz_t out, p256_double_int *in)
         out->_mp_d[i] = in->data[i];
 
     out->_mp_size = in->len;
+}
+
+
+//Order Field
+// out = a mod order
+void p256int_mod_order(p256_int *out, p256_int *a, p256_int *mod)
+{
+    mpz_t a_mpz, mod_mpz, out_mpz;
+
+    mpz_init2(a_mpz, 256);
+    mpz_init2(mod_mpz, 256);
+    mpz_init2(out_mpz, 256);
+
+    p256int_to_mpz(a_mpz, a);
+    p256int_to_mpz(mod_mpz, mod);
+    mpz_mod(out_mpz, a_mpz, mod_mpz);
+    mpz_to_p256int(out, out_mpz);
+
+    mpz_clear(a_mpz);
+    mpz_clear(mod_mpz);
+    mpz_clear(out_mpz);
+}
+
+
+// out = a + b mod order
+void p256int_add_order(p256_int *out, p256_int *a, p256_int *b, p256_int *p)
+{
+	mpz_t ma, mb, mp, mout;
+
+	mpz_init2(ma, 512);
+	mpz_init2(mb, 512);
+	mpz_init2(mp, 512);
+	mpz_init2(mout, 512);
+
+	p256int_to_mpz(ma, a);
+	p256int_to_mpz(mb, b);
+	p256int_to_mpz(mp, p);
+
+	mpz_add(mb, ma, mb);
+	mpz_mod(mout, mb, mp);
+
+	mpz_to_p256int(out, mout);
+
+	mpz_clear(ma);
+	mpz_clear(mb);
+	mpz_clear(mp);
+	mpz_clear(mout);
+
+}
+
+// out = a - b mod order 
+void p256int_sub_order(p256_int *out, p256_int *a, p256_int *b, p256_int *p)
+{
+	mpz_t ma, mb, mp, mout;
+
+	mpz_init2(ma, 512);
+	mpz_init2(mb, 512);
+	mpz_init2(mp, 512);
+	mpz_init2(mout, 512);
+
+	p256int_to_mpz(ma, a);
+	p256int_to_mpz(mb, b);
+	p256int_to_mpz(mp, p);
+
+	mpz_sub(mb, ma, mb);
+	mpz_mod(mout, mb, mp);
+
+	mpz_to_p256int(out, mout);
+
+	mpz_clear(ma);
+	mpz_clear(mb);
+	mpz_clear(mp);
+	mpz_clear(mout);
+}
+
+// out = a * b mod order
+void p256int_mul_order(p256_int *out, p256_int *a, p256_int *b, p256_int *p)
+{
+	mpz_t ma, mb, mp, mout;
+
+	mpz_init2(ma, 512);
+	mpz_init2(mb, 512);
+	mpz_init2(mp, 512);
+	mpz_init2(mout, 512);
+
+	p256int_to_mpz(ma, a);
+	p256int_to_mpz(mb, b);
+	p256int_to_mpz(mp, p);
+
+	mpz_mul(mb, ma, mb);
+	mpz_mod(mout, mb, mp);
+
+	mpz_to_p256int(out, mout);
+
+	mpz_clear(ma);
+	mpz_clear(mb);
+	mpz_clear(mp);
+	mpz_clear(mout);
+}
+
+// out = a^(-1) mod order
+int p256int_inv_order(p256_int *out, p256_int *a, p256_int *p)
+{
+	mpz_t ma, mp, mout;
+
+	mpz_init2(ma, 512);
+	mpz_init2(mp, 512);
+	mpz_init2(mout, 512);
+
+	p256int_to_mpz(ma, a);
+	p256int_to_mpz(mp, p);
+
+	mpz_invert(mout, ma, mp);
+	mpz_to_p256int(out, mout);
+
+	mpz_clear(ma);
+	mpz_clear(mp);
+	mpz_clear(mout);
+    return 0;
 }

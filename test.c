@@ -3,6 +3,7 @@
 #include <gmp.h>
 #include "p256_int.h"
 #include "p256_AF.h"
+#include "p256_ECC.h"
 
 clock_t elapsed; float sec;
 
@@ -22,6 +23,7 @@ clock_t elapsed; float sec;
  printf("\n[%s: %.5f s]\n",qstr,sec);\
 }\
 
+unsigned char hex(unsigned char ch);
 void test_p256_add_sub();
 void test_p256_mul();
 void test_p256_ADD_DBL();
@@ -30,18 +32,13 @@ void test_ECDH();
 void test_pub_key_validation();
 void test_p256int_bytes_conversions();
 void test_p256_SMUL_speed();
+void test_ECDSA();
 
 
 int main(void)
 {
-    printf("\n---------test_pub_key_validation-------=--\n");
-    test_pub_key_validation();
-    printf("\n------test_p256int_bytes_conversions------\n");
-    test_p256int_bytes_conversions();
-    printf("\n-----------test_p256_SMUL_speed-----------\n");
-    test_p256_SMUL_speed();
-    printf("\n----------------test_ECDH-----------------\n");
-    test_ECDH();
+    printf("---------test_ECDSA-------=--\n");
+    test_ECDSA();
 
     return 0;
 }
@@ -400,4 +397,53 @@ void test_p256_SMUL_speed()
     p256_AF_M_m_ary_smul(&R, &p256_order, &p256_base_point);
     STOP_WATCH
     PRINT_TIME("Modified m-ary smul");
+}
+
+
+unsigned char hex(unsigned char ch)
+{
+    if('0' <= ch && ch <= '9')
+        return ch - '0' + 0x0;
+    if('a' <= ch && ch <= 'f')
+        return ch - 'a' + 0xA;
+    if('A' <= ch && ch <= 'F')
+        return ch - 'A' + 0xA;
+    return -1;
+}
+
+void test_ECDSA()
+{
+    unsigned char Msg[32], _Msg[] = "44acf6b7e36c1342c2c5897204fe09504e1e2efb1a900377dbc4e7a6a133ec56";
+    unsigned char d[32], _d[]     = "519b423d715f8b581f4fa8ee59f4771a5b44c8130b4e3eacca54a56dda72b464";
+    unsigned char Qx[32], _Qx[]   = "1ccbe91c075fc7f4f033bfa248db8fccd3565de94bbfb12f3c59ff46c271bf83";
+    unsigned char Qy[32], _Qy[]   = "ce4014c68811f9a21a1fdb2c0e6113e06db7ca93b7404e78dc7ccd5ca89a4ca9";
+    unsigned char k[32], _k[]     = "94a1bbb14b906a61a280f245f9e93c7f3b4a6247824f5d33b9670787642a68de";
+    unsigned char R[32], _R[]     = "f3ac8061b514795b8843e3d6629527ed2afd6b1f6a555a7acabb5e6f79c8c2ac";
+    unsigned char S[32], _S[]     = "8bf77819ca05a6b2786c76262bf7371cef97b218e96f175a3ccdda2acc058903";
+    unsigned char myR[32], myS[32];
+
+    for(int i=0;i<32;i++)
+    {
+        Msg[i] = hex(_Msg[i*2])*0x10 + hex(_Msg[i*2+1]);
+        d[i] = hex(_d[i*2])*0x10 + hex(_d[i*2+1]);
+        Qx[i] = hex(_Qx[i*2])*0x10 + hex(_Qx[i*2+1]);
+        Qy[i] = hex(_Qy[i*2])*0x10 + hex(_Qy[i*2+1]);
+        k[i] = hex(_k[i*2])*0x10 + hex(_k[i*2+1]);
+        R[i] = hex(_R[i*2])*0x10 + hex(_R[i*2+1]);
+        S[i] = hex(_S[i*2])*0x10 + hex(_S[i*2+1]);
+    }
+    
+    int res1 = p256_ECDSA_sign(myR, myS, k, d, Msg);
+    printf("* Signing Result (0:success, -1:error) : %d\n", res1);
+    printf(" - R : ");
+    for(int i=0;i<32;i++)
+        printf("%02x", myR[i]);
+    printf("\n");
+    printf(" - S : ");
+    for(int i=0;i<32;i++)
+        printf("%02x", myS[i]);
+    printf("\n\n");
+
+    int res2 = p256_ECDSA_verify(myR, myS, Msg, Qx, Qy);
+    printf("* Verification Result (1:pass, 0:fail) : %d\n", res2);
 }
