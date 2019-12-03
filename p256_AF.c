@@ -152,3 +152,59 @@ int p256_AF_M_m_ary_smul(p256_AF_pt *R, p256_int *k, p256_AF_pt *P)
 
     return 0;
 }
+
+
+int p256_AF_comb_precompute(p256_AF_pt *P)
+{
+    for(int i=0;i<256;i++)
+        P_comb[i].at_infinity = 1;
+
+    p256_AF_cpy(&P_comb[1], P);
+    for(int e=1;e<combsize;e++)
+    {
+        p256_AF_cpy(&P_comb[1<<e], &P_comb[1<<(e-1)]);
+        for(int i=0;i<(256/combsize);i++)
+            p256_AF_dbl(&P_comb[1<<e], &P_comb[1<<e]);
+    }
+    for(int i=3;i<256;i++)
+    {
+        if((i&(i-1))==0)
+            continue;
+        for(int b=1;b<256;b<<=1)
+        {
+            if(i & b)
+                p256_AF_add(&P_comb[i], &P_comb[i], &P_comb[b]);
+        }
+    }
+    return 0;
+}
+
+
+int p256_AF_comb_smul(p256_AF_pt *R, p256_int *k, p256_AF_pt *P)
+{
+    lint b1 = 0x8000000000000000; int blen1 = 63;
+    lint b2 = 0x0000000080000000; int blen2 = 31;
+    p256_AF_pt res;
+    res.at_infinity = 1;
+
+    for(int i=P256_MAX_WORD_LEN-1;i>=(k->len);i--)
+        k->data[i] = 0;
+
+    for(int i=0;i<32;i++)
+    {
+        int idx = 0;
+        for(int j=3;j>=0;j--)
+        {
+            idx <<= 1;
+            idx |= ((k->data[j]) & b1)>>blen1;
+            idx <<= 1;
+            idx |= ((k->data[j]) & b2)>>blen2;
+        }
+        b1 >>= 1; b2 >>= 1;
+        blen1--;  blen2--;
+        p256_AF_dbl(&res, &res);
+        p256_AF_add(&res, &res, &P_comb[idx]);
+    }
+    p256_AF_cpy(R, &res);
+    return 0;
+}

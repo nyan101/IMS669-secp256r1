@@ -11,13 +11,14 @@ int p256_ECDSA_sign(unsigned char *r,   // sign value 1 (output)
                     unsigned char *s,   // sign value 2 (output)
                     unsigned char *k,   // random seed  (input)
                     unsigned char *d,   // private key  (input)
-                    unsigned char *hm); // message hash (input)
+                    unsigned char *hm,  // message hash (input)
+                    int mode);
 
 int p256_ECDSA_verify(unsigned char *_r,   // sign value 1 (input)
                       unsigned char *_s,   // sign value 2 (input)
                       unsigned char *_hm,  // message hash (input)
                       unsigned char *_Qx,  // public key   (input)
-                      unsigned char *_Qy);
-
+                      unsigned char *_Qy,
+                      int mode);
 
 #endif

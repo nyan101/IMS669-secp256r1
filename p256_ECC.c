@@ -50,7 +50,8 @@ int p256_ECDSA_sign(unsigned char *_r,   // sign value 1 (output)
                     unsigned char *_s,   // sign value 2 (output)
                     unsigned char *_k,   // random seed  (input)
                     unsigned char *_d,   // private key  (input)
-                    unsigned char *_hm)  // message hash (input)
+                    unsigned char *_hm,
+                    int mode)  // message hash (input)
 {
     p256_int r, s, k, d, hm, kinv;
     p256_AF_pt Q;
@@ -59,7 +60,10 @@ int p256_ECDSA_sign(unsigned char *_r,   // sign value 1 (output)
     bytes_to_p256int(&d, _d, 32);
     bytes_to_p256int(&hm, _hm, 32);
     
-    p256_AF_binary_smul(&Q, &k, &p256_base_point);
+    if(mode==1)      p256_AF_binary_smul(&Q, &k, &p256_base_point);
+    else if(mode==2) p256_AF_M_m_ary_smul(&Q, &k, &p256_base_point);
+    else if(mode==3) p256_AF_comb_smul(&Q, &k, &p256_base_point);
+    else return -1;
     p256int_mod_order(&r, &Q.x, &p256_order);
     
     if(r.len==0) return -1;
@@ -93,7 +97,8 @@ int p256_ECDSA_verify(unsigned char *_r,   // sign value 1 (input)
                       unsigned char *_s,   // sign value 2 (input)
                       unsigned char *_hm,  // message hash (input)
                       unsigned char *_Qx,  // public key   (input)
-                      unsigned char *_Qy)
+                      unsigned char *_Qy,
+                      int mode)
 {
     p256_int r, s, hm, u1, u2, v;
     p256_AF_pt Q, X, Xt;
@@ -115,7 +120,10 @@ int p256_ECDSA_verify(unsigned char *_r,   // sign value 1 (input)
     p256int_inv_order(&s, &s, &p256_order);
     p256int_mul_order(&u1, &hm, &s, &p256_order);
     p256int_mul_order(&u2, &r, &s, &p256_order);
-    p256_AF_binary_smul(&X, &u1, &p256_base_point);
+    if(mode==1)      p256_AF_binary_smul(&X, &u1, &p256_base_point);
+    else if(mode==2) p256_AF_M_m_ary_smul(&X, &u1, &p256_base_point);
+    else if(mode==3) p256_AF_comb_smul(&X, &u1, &p256_base_point);
+    else return -1;
     p256_AF_binary_smul(&Xt, &u2, &Q);
     p256_AF_add(&X, &X, &Xt);
 
